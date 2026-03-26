@@ -13,9 +13,6 @@
 #     -f helm/threadql/values.yaml \
 #     -f helm/threadql/haproxy.values.yaml
 
-imagePullSecrets:
-  - name: registry-credentials
-
 mysql:
   enabled: true
   rootPassword: CHANGE_ME_MYSQL_ROOT_PASSWORD
