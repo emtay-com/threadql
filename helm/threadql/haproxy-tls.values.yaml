@@ -1,0 +1,42 @@
+# Example values for HAProxy ingress controller + cert-manager TLS
+#
+# Prerequisites:
+#   1. cert-manager installed:
+#      kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
+#
+# Usage:
+#   helm install threadql helm/threadql -f helm/threadql/haproxy-tls.values.yaml
+
+haproxy:
+  enabled: true
+  controller:
+    service:
+      type: LoadBalancer
+    ingressClassResource:
+      name: haproxy
+      default: true
+
+ingress:
+  enabled: true
+  className: haproxy
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: threadql.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: threadql-tls
+      hosts:
+        - threadql.example.com
+
+certManager:
+  enabled: true
+  email: admin@example.com
+  issuerName: letsencrypt-prod
+  server: https://acme-v02.api.letsencrypt.org/directory
+  solvers:
+    - http01:
+        ingress:
+          ingressClassName: haproxy

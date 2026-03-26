@@ -1,0 +1,94 @@
+{{- if .Values.worker.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "threadql.fullname" . }}-worker
+  labels:
+    {{- include "threadql.worker.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.worker.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "threadql.worker.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/env: {{ include (print $.Template.BasePath "/secret-env.yaml") . | sha256sum }}
+        checksum/supervisor: {{ include (print $.Template.BasePath "/configmap-supervisor.yaml") . | sha256sum }}
+        {{- with .Values.worker.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "threadql.worker.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.mysql.enabled }}
+      initContainers:
+        - name: wait-for-mysql
+          image: "{{ .Values.worker.image.repository }}:{{ include "threadql.imageTag" (dict "imageConfig" .Values.worker.image "global" .Values) }}"
+          imagePullPolicy: {{ .Values.worker.image.pullPolicy }}
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for MySQL on {{ include "threadql.fullname" . }}-mysql:3306..."
+              while ! php -r "@fsockopen('{{ include "threadql.fullname" . }}-mysql', 3306, \$errno, \$errstr, 3) or exit(1);" 2>/dev/null; do
+                echo "MySQL not ready, retrying in 3s..."
+                sleep 3
+              done
+              echo "MySQL is ready."
+      {{- end }}
+      containers:
+        - name: worker
+          image: "{{ .Values.worker.image.repository }}:{{ include "threadql.imageTag" (dict "imageConfig" .Values.worker.image "global" .Values) }}"
+          imagePullPolicy: {{ .Values.worker.image.pullPolicy }}
+          command: ["supervisord", "--nodaemon", "--configuration", "/etc/supervisor/supervisord.conf"]
+          envFrom:
+            {{- include "threadql.envFrom" . | nindent 12 }}
+          {{- with .Values.worker.extraEnv }}
+          env:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: supervisor-config
+              mountPath: /etc/supervisor/supervisord.conf
+              subPath: supervisord.conf
+              readOnly: true
+            - name: supervisor-config
+              mountPath: /etc/supervisor/conf.d/worker.conf
+              subPath: worker.conf
+              readOnly: true
+          {{- with .Values.worker.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pgrep -f "queue:work" > /dev/null
+            initialDelaySeconds: 15
+            periodSeconds: 30
+
+      volumes:
+        - name: supervisor-config
+          configMap:
+            name: {{ include "threadql.fullname" . }}-supervisor
+
+      {{- with .Values.worker.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.worker.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.worker.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

@@ -1,0 +1,296 @@
+# -- Application version used as the default image tag for all ThreadQL images.
+# This is the single source of truth for the deployed version.
+version: "0.1.0"
+
+# -- Global overrides
+nameOverride: ""
+fullnameOverride: ""
+
+imagePullSecrets: []
+
+# =============================================================================
+# App Deployment (nginx + php-fpm in a single pod)
+# =============================================================================
+app:
+  replicaCount: 1
+
+  php:
+    image:
+      repository: emtaycom/threadql
+      # tag: defaults to .Values.version — override here to pin a specific image
+      pullPolicy: IfNotPresent
+    resources: {}
+    #  requests:
+    #    cpu: 250m
+    #    memory: 256Mi
+    #  limits:
+    #    cpu: "1"
+    #    memory: 512Mi
+    extraEnv: []
+    # - name: PHP_MEMORY_LIMIT
+    #   value: "256M"
+
+  nginx:
+    image:
+      repository: nginx
+      tag: latest
+      pullPolicy: IfNotPresent
+    resources: {}
+    #  requests:
+    #    cpu: 50m
+    #    memory: 64Mi
+    #  limits:
+    #    cpu: 200m
+    #    memory: 128Mi
+
+  service:
+    type: ClusterIP
+    port: 80
+
+  podAnnotations: {}
+  podSecurityContext: {}
+  securityContext: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# =============================================================================
+# Worker Deployment (supervisord with queue workers)
+# =============================================================================
+worker:
+  enabled: true
+  replicaCount: 1
+
+  image:
+    repository: emtaycom/threadql-worker
+    # tag: defaults to .Values.version — override here to pin a specific image
+    pullPolicy: IfNotPresent
+
+  resources: {}
+  extraEnv: []
+
+  podAnnotations: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# =============================================================================
+# SSH Tunnel Manager
+# =============================================================================
+sshTunnel:
+  enabled: true
+
+  image:
+    repository: emtaycom/threadql-ssh-tunnel
+    # tag: defaults to .Values.version — override here to pin a specific image
+    pullPolicy: IfNotPresent
+
+  resources: {}
+  extraEnv: []
+
+  # Port range for forwarded database tunnels.
+  # The service exposes this entire range so PHP pods can connect.
+  portRangeStart: 13300
+  portRangeEnd: 13399
+
+  service:
+    apiPort: 8092
+
+  podAnnotations: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# =============================================================================
+# Redis (optional in-cluster instance)
+# Set enabled: false and configure REDIS_HOST in env to use external Redis.
+# =============================================================================
+redis:
+  enabled: true
+
+  image:
+    repository: redis
+    tag: 7-alpine
+    pullPolicy: IfNotPresent
+
+  resources: {}
+
+  persistence:
+    enabled: true
+    size: 1Gi
+    storageClass: ""
+    accessModes:
+      - ReadWriteOnce
+
+  podAnnotations: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# =============================================================================
+# MySQL (optional in-cluster instance)
+# Set enabled: false and configure DB_* in env to use external database.
+# =============================================================================
+mysql:
+  enabled: true
+
+  image:
+    repository: mysql
+    tag: "8.0"
+    pullPolicy: IfNotPresent
+
+  # rootPassword is required when mysql.enabled is true.
+  # Use a strong password in production.
+  rootPassword: ""
+  database: threadql
+
+  resources: {}
+
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: ""
+    accessModes:
+      - ReadWriteOnce
+
+  podAnnotations: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# =============================================================================
+# HAProxy Ingress Controller (optional subchart)
+# Provides an ingress controller for clusters that don't have one (e.g. DOKS,
+# EKS, GKE). On k3s (which ships Traefik), set enabled: false.
+# Full values reference: https://github.com/haproxytech/helm-charts
+# =============================================================================
+haproxy:
+  enabled: true
+  controller:
+    # On cloud providers (DO, AWS, GKE) this creates a LoadBalancer.
+    # On bare-metal / k3s, change to NodePort or set enabled: false.
+    service:
+      type: LoadBalancer
+    ingressClassResource:
+      name: haproxy
+      default: true
+
+# =============================================================================
+# Ingress
+# =============================================================================
+ingress:
+  enabled: true
+
+  # Matches the HAProxy IngressClass when haproxy is enabled.
+  # On k3s with haproxy.enabled=false, set to "" or "traefik".
+  className: haproxy
+
+  annotations: {}
+  # Example for cert-manager:
+  #   cert-manager.io/cluster-issuer: letsencrypt-prod
+
+  hosts:
+    - host: threadql.local
+      paths:
+        - path: /
+          pathType: Prefix
+
+  tls: []
+  # - secretName: threadql-tls
+  #   hosts:
+  #     - threadql.local
+
+# =============================================================================
+# cert-manager ClusterIssuer for Let's Encrypt (optional)
+# Creates a ClusterIssuer resource for automatic TLS certificates.
+# Requires cert-manager to be installed in the cluster BEFORE deploying:
+#   kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
+# =============================================================================
+certManager:
+  enabled: false
+  # Email for Let's Encrypt registration and expiry notifications
+  email: ""
+  # Use "letsencrypt-staging" for testing, "letsencrypt-prod" for production
+  issuerName: letsencrypt-prod
+  # Let's Encrypt server URL
+  # Staging: https://acme-staging-v02.api.letsencrypt.org/directory
+  # Production: https://acme-v02.api.letsencrypt.org/directory
+  server: https://acme-v02.api.letsencrypt.org/directory
+  # ACME challenge solver — http01 works with any ingress controller
+  solvers:
+    - http01:
+        ingress:
+          # MUST match ingress.className (e.g. "haproxy" or "traefik")
+          ingressClassName: haproxy
+
+# =============================================================================
+# Environment Variables
+#
+# Option A: Point to an existing Secret or ConfigMap.
+# Option B: Leave secretRef/configMapRef empty and the chart creates a Secret
+#           from the `env` map below.
+# =============================================================================
+envFrom:
+  # Name of an existing Secret containing Laravel env vars
+  secretRef: ""
+  # Name of an existing ConfigMap containing Laravel env vars
+  configMapRef: ""
+
+# These values are used to create a Secret when envFrom.secretRef is empty.
+# DB_HOST, REDIS_HOST, MCP_APP_URL, and SSH_TUNNEL_MANAGER_URL are auto-set
+# by the chart when their respective components are enabled.
+env:
+  APP_NAME: ThreadQL
+  APP_ENV: production
+  THREADQL_VERSION: "0.0.6"
+  APP_KEY: ""  # Required — generate with: php artisan key:generate --show
+  APP_DEBUG: "false"
+  APP_URL: "https://threadql.local"
+
+  LOG_CHANNEL: stderr
+  LOG_LEVEL: warning
+
+  DB_CONNECTION: mysql
+  # DB_HOST: auto-set when mysql.enabled
+  DB_PORT: "3306"
+  DB_DATABASE: threadql
+  DB_USERNAME: root
+  DB_PASSWORD: ""
+
+  SESSION_DRIVER: redis
+  SESSION_LIFETIME: "120"
+
+  QUEUE_CONNECTION: redis
+  CACHE_STORE: redis
+
+  # REDIS_HOST: auto-set when redis.enabled
+  REDIS_PORT: "6379"
+  REDIS_PASSWORD: ""
+
+  BROADCAST_CONNECTION: log
+  FILESYSTEM_DISK: local
+
+  BCRYPT_ROUNDS: "12"
+
+  MASTER_ADMIN_PASSWORD: "changeme" # Required — generate with: php artisan key:generate --show
+
+# =============================================================================
+# CronJobs
+# Each entry generates a Kubernetes CronJob using the PHP app image.
+# All cronjobs share the same envFrom as the app.
+# =============================================================================
+cronjobs:
+ - name: schedule-schema-scans
+   schedule: "0,30 * * * *"
+   command: ["php", "artisan", "schema:schedule-scans"]
+   restartPolicy: Never
+   resources: {}
+   extraEnv: []
+
+# =============================================================================
+# Database Migration Job (Helm hook — runs before install/upgrade)
+# =============================================================================
+migration:
+  enabled: true
+  command: ["php", "artisan", "migrate", "--force"]
+  resources: {}

@@ -1,0 +1,2 @@
+{{/* Migration is now handled as an initContainer in deployment-app.yaml */}}
+{{/* See migration.enabled and migration.command in values.yaml */}}

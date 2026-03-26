@@ -1,0 +1,100 @@
+ThreadQL has been deployed!
+
+1. Application URL:
+{{- if .Values.ingress.enabled }}
+{{- range .Values.ingress.hosts }}
+   http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}
+{{- end }}
+{{- else }}
+   kubectl port-forward svc/{{ include "threadql.fullname" . }} {{ .Values.app.service.port }}:{{ .Values.app.service.port }}
+   Then visit: http://localhost:{{ .Values.app.service.port }}
+{{- end }}
+
+2. Components deployed:
+   - App (nginx + php-fpm): {{ .Values.app.replicaCount }} replica(s)
+{{- if .Values.worker.enabled }}
+   - Worker (queue processor): {{ .Values.worker.replicaCount }} replica(s)
+{{- end }}
+{{- if .Values.sshTunnel.enabled }}
+   - SSH Tunnel Manager: 1 replica (ports {{ .Values.sshTunnel.portRangeStart }}-{{ .Values.sshTunnel.portRangeEnd }})
+{{- end }}
+{{- if .Values.redis.enabled }}
+   - Redis: in-cluster
+{{- end }}
+{{- if .Values.mysql.enabled }}
+   - MySQL: in-cluster (StatefulSet)
+{{- end }}
+{{- if .Values.haproxy.enabled }}
+   - HAProxy Ingress Controller (IngressClass: haproxy)
+{{- end }}
+
+{{- if .Values.haproxy.enabled }}
+
+3. Ingress Controller:
+   HAProxy Ingress Controller has been deployed.
+{{- if eq (toString .Values.haproxy.controller.service.type) "LoadBalancer" }}
+   Waiting for LoadBalancer IP:
+     kubectl get svc -l app.kubernetes.io/name=kubernetes-ingress --namespace {{ .Release.Namespace }}
+   Point your DNS ({{ (index .Values.ingress.hosts 0).host }}) to the EXTERNAL-IP.
+{{- end }}
+{{- end }}
+
+{{- if .Values.certManager.enabled }}
+
+4. TLS/SSL:
+   cert-manager ClusterIssuer "{{ .Values.certManager.issuerName }}" has been created.
+
+   Prerequisites:
+     cert-manager must be installed BEFORE deploying this chart:
+       kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
+
+   IMPORTANT: The solver ingressClassName in certManager.solvers MUST match
+   ingress.className (currently "{{ .Values.ingress.className }}"). If they differ,
+   the ACME HTTP-01 challenge will time out and no certificate will be issued.
+
+   To enable TLS on your ingress, add to your values:
+     ingress:
+       annotations:
+         cert-manager.io/cluster-issuer: {{ .Values.certManager.issuerName }}
+       tls:
+         - secretName: threadql-tls
+           hosts:
+             - {{ (index .Values.ingress.hosts 0).host }}
+
+   Debugging TLS issues:
+     kubectl get certificate -A
+     kubectl get certificaterequest -A
+     kubectl get order -A
+     kubectl describe challenge -A
+     kubectl logs -n cert-manager deploy/cert-manager
+{{- end }}
+
+{{- if not .Values.env.APP_KEY }}
+
+WARNING: APP_KEY is not set! Generate one with:
+  php artisan key:generate --show
+Then set it in your values:
+  env:
+    APP_KEY: "base64:your-generated-key"
+{{- end }}
+
+{{- if and .Values.mysql.enabled (not .Values.mysql.rootPassword) }}
+
+WARNING: mysql.rootPassword is not set! The MySQL pod will fail to start.
+{{- end }}
+
+{{- if .Values.cronjobs }}
+
+5. CronJobs configured:
+{{- range .Values.cronjobs }}
+   - {{ .name }}: {{ .schedule }}
+{{- end }}
+{{- end }}
+
+---
+Quick Start (k3s — already has Traefik):
+  Set haproxy.enabled=false and ingress.className="" in your values.
+
+Quick Start (DigitalOcean / AWS / GKE — no ingress controller):
+  HAProxy Ingress is deployed by default and provisions a cloud LoadBalancer.
+  Point your DNS A record to the LoadBalancer EXTERNAL-IP.

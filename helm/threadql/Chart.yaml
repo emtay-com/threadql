@@ -1,0 +1,22 @@
+apiVersion: v2
+name: threadql
+description: A Helm chart for ThreadQL - multi-tenant natural language to SQL via Slack
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - laravel
+  - slack
+  - sql
+  - llm
+  - mcp
+home: https://github.com/emtay-com/threadql
+maintainers:
+  - name: emtaycom
+
+dependencies:
+  - name: kubernetes-ingress
+    version: "~1.41"
+    repository: https://haproxytech.github.io/helm-charts
+    alias: haproxy
+    condition: haproxy.enabled

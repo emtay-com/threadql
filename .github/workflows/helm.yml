@@ -1,0 +1,113 @@
+name: Helm Chart Validation
+
+on:
+  push:
+    branches: [ "master" ]
+    paths:
+      - 'helm/**'
+  pull_request:
+    branches: [ "master" ]
+    paths:
+      - 'helm/**'
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint & Template
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.16.4
+
+      - name: Add Helm repositories
+        run: helm repo add haproxytech https://haproxytech.github.io/helm-charts
+
+      - name: Build dependencies
+        run: helm dependency build helm/threadql
+
+      - name: Helm lint
+        run: helm lint helm/threadql --strict --set mysql.rootPassword=test
+
+      - name: Helm template (default values)
+        run: helm template threadql helm/threadql --set mysql.rootPassword=test
+
+      - name: Helm template (external DB + Redis, no HAProxy)
+        run: |
+          helm template threadql helm/threadql \
+            --set mysql.enabled=false \
+            --set redis.enabled=false \
+            --set haproxy.enabled=false \
+            --set ingress.className="" \
+            --set env.DB_HOST=external-db.example.com \
+            --set env.DB_PASSWORD=secret \
+            --set env.REDIS_HOST=external-redis.example.com
+
+      - name: Helm template (with TLS + cert-manager)
+        run: |
+          helm template threadql helm/threadql \
+            --set mysql.rootPassword=test \
+            --set certManager.enabled=true \
+            --set certManager.email=admin@example.com \
+            --set ingress.annotations."cert-manager\.io/cluster-issuer"=letsencrypt-prod \
+            --set ingress.tls[0].secretName=threadql-tls \
+            --set ingress.tls[0].hosts[0]=threadql.example.com \
+            --set ingress.hosts[0].host=threadql.example.com \
+            --set ingress.hosts[0].paths[0].path=/ \
+            --set ingress.hosts[0].paths[0].pathType=Prefix
+
+      - name: Helm template (Traefik TLS example)
+        run: |
+          helm template threadql helm/threadql \
+            --set mysql.rootPassword=test \
+            -f helm/threadql/traefik-tls.values.yaml
+
+      - name: Helm template (HAProxy TLS example)
+        run: |
+          helm template threadql helm/threadql \
+            --set mysql.rootPassword=test \
+            -f helm/threadql/haproxy-tls.values.yaml
+
+      - name: Helm template (with cronjobs)
+        run: |
+          helm template threadql helm/threadql \
+            --set mysql.rootPassword=test \
+            --set cronjobs[0].name=scheduler \
+            --set cronjobs[0].schedule="* * * * *" \
+            --set cronjobs[0].command[0]=php \
+            --set cronjobs[0].command[1]=artisan \
+            --set cronjobs[0].command[2]=schedule:run
+
+  kubeconform:
+    name: Validate Kubernetes Schemas
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.16.4
+
+      - name: Install kubeconform
+        run: |
+          curl -fsSL https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz \
+            | tar xzf - -C /usr/local/bin
+
+      - name: Add Helm repositories
+        run: helm repo add haproxytech https://haproxytech.github.io/helm-charts
+
+      - name: Build dependencies
+        run: helm dependency build helm/threadql
+
+      - name: Validate rendered manifests
+        run: |
+          helm template threadql helm/threadql --set mysql.rootPassword=test \
+            | kubeconform -strict -summary \
+              -skip ClusterIssuer \
+              -kubernetes-version 1.30.0

@@ -1,0 +1,34 @@
+{
+    "$schema": "https://json.schemastore.org/package.json",
+    "private": true,
+    "license": "MIT",
+    "type": "module",
+    "scripts": {
+        "build": "vite build",
+        "dev": "vite",
+        "test": "vitest"
+    },
+    "devDependencies": {
+        "@tailwindcss/vite": "^4.0.0",
+        "@testing-library/dom": "^10.4.1",
+        "@testing-library/jest-dom": "^6.9.1",
+        "@testing-library/react": "^16.3.2",
+        "@types/react": "^19.2.7",
+        "@types/react-dom": "^19.2.3",
+        "@vitejs/plugin-react": "^5.1.1",
+        "axios": "^1.11.0",
+        "concurrently": "^9.0.1",
+        "jsdom": "^28.1.0",
+        "laravel-vite-plugin": "^2.0.0",
+        "react": "^19.2.1",
+        "react-dom": "^19.2.1",
+        "tailwindcss": "^4.0.0",
+        "vite": "^7.0.4",
+        "vitest": "^4.0.18"
+    },
+    "dependencies": {
+        "jwt-decode": "^4.0.0",
+        "react-router-dom": "^7.10.1",
+        "zustand": "^5.0.9"
+    }
+}

@@ -1,0 +1,20 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    level: 5
+    treatPhpDocTypesAsCertain: false
+
+    paths:
+        - app
+        - config
+        - routes
+        - database
+
+    excludePaths:
+        analyse:
+            - app/Console/Commands/AnonymizeToolCallsCommand.php
+            - bootstrap/cache/*
+            - storage/*
+
+    tmpDir: storage/phpstan

@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "threadql.fullname" . }}-supervisor
+  labels:
+    {{- include "threadql.worker.labels" . | nindent 4 }}
+data:
+  supervisord.conf: |
+    [unix_http_server]
+    file=/var/run/supervisor.sock
+    chmod=0700
+
+    [supervisord]
+    logfile=/var/log/supervisord.log
+    pidfile=/var/run/supervisord.pid
+    nodaemon=true
+
+    [rpcinterface:supervisor]
+    supervisor.rpcinterface_factory = supervisor.rpcinterface:make_main_rpcinterface
+
+    [supervisorctl]
+    serverurl=unix:///var/run/supervisor.sock
+
+    [include]
+    files = /etc/supervisor/conf.d/*.conf
+
+  worker.conf: |
+    [program:normal-worker]
+    process_name=%(program_name)s_%(process_num)02d
+    command=/usr/local/bin/php /var/www/app/artisan queue:work --tries=3 --queue=default
+    numprocs=3
+    autostart=true
+    autorestart=true
+    stdout_logfile=/dev/stdout
+    stdout_logfile_maxbytes=0
+    stderr_logfile=/dev/stderr
+    stderr_logfile_maxbytes=0
+    stopasgroup=true
+    killasgroup=true
+
+    [program:long-worker]
+    process_name=%(program_name)s_%(process_num)02d
+    command=/usr/local/bin/php /var/www/app/artisan queue:work --queue=long_queue --sleep=5 --tries=1 --timeout=1440
+    numprocs=3
+    autostart=true
+    autorestart=true
+    stdout_logfile=/dev/stdout
+    stdout_logfile_maxbytes=0
+    stderr_logfile=/dev/stderr
+    stderr_logfile_maxbytes=0
+    stopasgroup=true
+    killasgroup=true

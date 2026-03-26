@@ -1,0 +1,103 @@
+# PostgreSQL demo deployment with Pagila sample database
+#
+# Do not apply directly — use the deploy script instead:
+#   ./stubs/deploy-postgres-demo.sh
+#
+# Connection string (from within the cluster):
+#   postgresql://postgresdemo:postgresdemo@postgres.postgresdemo.svc.cluster.local:5432/pagila
+#
+# Cleanup:
+#   kubectl delete namespace postgresdemo
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: postgresdemo
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-data
+  namespace: postgresdemo
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 512Mi
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: postgresdemo
+  labels:
+    app: postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:15-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              value: postgresdemo
+            - name: POSTGRES_PASSWORD
+              value: postgresdemo
+            - name: POSTGRES_DB
+              value: pagila
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+              subPath: pgdata
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          readinessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - postgresdemo
+                - -d
+                - pagila
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: postgres-data
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: postgresdemo
+  labels:
+    app: postgres
+spec:
+  selector:
+    app: postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+      protocol: TCP

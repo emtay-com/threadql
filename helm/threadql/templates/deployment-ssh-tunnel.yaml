@@ -1,0 +1,82 @@
+{{- if .Values.sshTunnel.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "threadql.fullname" . }}-ssh-tunnel
+  labels:
+    {{- include "threadql.sshTunnel.labels" . | nindent 4 }}
+spec:
+  # SSH tunnels hold state in-memory — only one replica to avoid split-brain.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "threadql.sshTunnel.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.sshTunnel.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "threadql.sshTunnel.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: ssh-tunnel
+          image: "{{ .Values.sshTunnel.image.repository }}:{{ include "threadql.imageTag" (dict "imageConfig" .Values.sshTunnel.image "global" .Values) }}"
+          imagePullPolicy: {{ .Values.sshTunnel.image.pullPolicy }}
+          ports:
+            - name: api
+              containerPort: {{ .Values.sshTunnel.service.apiPort }}
+              protocol: TCP
+            # Tunnel ports {{ .Values.sshTunnel.portRangeStart }}-{{ .Values.sshTunnel.portRangeEnd }}
+            # are accessed via the headless service which resolves to the pod IP directly.
+          env:
+            - name: REDIS_URL
+              value: "redis://{{ include "threadql.redisHost" . }}:{{ .Values.env.REDIS_PORT | default "6379" }}"
+            - name: PORT_RANGE_START
+              value: {{ .Values.sshTunnel.portRangeStart | quote }}
+            - name: PORT_RANGE_END
+              value: {{ .Values.sshTunnel.portRangeEnd | quote }}
+            - name: HOST
+              value: "0.0.0.0"
+            - name: PORT
+              value: {{ .Values.sshTunnel.service.apiPort | quote }}
+            {{- with .Values.sshTunnel.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- with .Values.sshTunnel.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: api
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: api
+            initialDelaySeconds: 10
+            periodSeconds: 30
+
+      {{- with .Values.sshTunnel.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.sshTunnel.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.sshTunnel.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

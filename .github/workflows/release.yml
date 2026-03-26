@@ -1,0 +1,143 @@
+name: Release — Build and Push Tagged Images
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  validate-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.extract.outputs.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Extract version from values.yaml
+        id: extract
+        run: |
+          CHART_VERSION=$(grep -E '^version:' helm/threadql/values.yaml | head -1 | awk '{print $2}' | tr -d '"')
+          echo "version=$CHART_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Chart version: $CHART_VERSION"
+
+      - name: Validate tag matches chart version
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          CHART_VERSION="${{ steps.extract.outputs.version }}"
+
+          # Strip leading 'v' from tag if present
+          TAG_VERSION="${TAG#v}"
+
+          if [ "$TAG_VERSION" != "$CHART_VERSION" ]; then
+            echo "::error::Release tag '${TAG}' (parsed: ${TAG_VERSION}) does not match chart version '${CHART_VERSION}' in helm/threadql/values.yaml"
+            exit 1
+          fi
+          echo "Tag '${TAG}' matches chart version '${CHART_VERSION}'"
+
+  build-and-push:
+    needs: validate-version
+    runs-on: ubuntu-latest
+    environment: main
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: master
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      - name: Build and push threadql
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/php/Dockerfile
+          target: prod
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            emtaycom/threadql:${{ needs.validate-version.outputs.version }}
+            emtaycom/threadql:latest
+          cache-from: type=gha,scope=threadql
+          cache-to: type=gha,mode=max,scope=threadql
+
+      - name: Build and push threadql-worker
+        uses: docker/build-push-action@v6
+        with:
+          context: docker/worker
+          file: docker/worker/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            emtaycom/threadql-worker:${{ needs.validate-version.outputs.version }}
+            emtaycom/threadql-worker:latest
+          cache-from: type=gha,scope=threadql-worker
+          cache-to: type=gha,mode=max,scope=threadql-worker
+
+      - name: Build and push threadql-ssh-tunnel
+        uses: docker/build-push-action@v6
+        with:
+          context: ./docker/ssh-tunnel
+          file: ./docker/ssh-tunnel/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            emtaycom/threadql-ssh-tunnel:${{ needs.validate-version.outputs.version }}
+            emtaycom/threadql-ssh-tunnel:latest
+          cache-from: type=gha,scope=threadql-ssh-tunnel
+          cache-to: type=gha,mode=max,scope=threadql-ssh-tunnel
+
+  publish-helm-chart:
+    needs: [validate-version, build-and-push]
+    runs-on: ubuntu-latest
+    environment: main
+    steps:
+      - name: Checkout source repo
+        uses: actions/checkout@v4
+        with:
+          ref: master
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.16.4
+
+      - name: Add Helm repositories
+        run: helm repo add haproxytech https://haproxytech.github.io/helm-charts
+
+      - name: Build chart dependencies
+        run: helm dependency build helm/threadql
+
+      - name: Package Helm chart
+        run: helm package helm/threadql --destination .helm-pkg
+
+      - name: Checkout helm-charts repo
+        uses: actions/checkout@v4
+        with:
+          repository: emtay-com/helm-charts
+          token: ${{ secrets.HELM_CHARTS_TOKEN }}
+          path: helm-charts-repo
+
+      - name: Update Helm repo index and push
+        run: |
+          cp .helm-pkg/*.tgz helm-charts-repo/
+          if [ -f helm-charts-repo/index.yaml ]; then
+            helm repo index helm-charts-repo --url https://emtay-com.github.io/helm-charts --merge helm-charts-repo/index.yaml
+          else
+            helm repo index helm-charts-repo --url https://emtay-com.github.io/helm-charts
+          fi
+          cd helm-charts-repo
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -m "feat: publish threadql chart ${{ needs.validate-version.outputs.version }}"
+          git push

@@ -1,0 +1,54 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "threadql.fullname" . }}-nginx
+  labels:
+    {{- include "threadql.app.labels" . | nindent 4 }}
+data:
+  default.conf: |
+    server {
+        listen 80;
+        server_name _;
+        server_tokens off;
+        root /var/www/app/public;
+        index index.php index.html;
+
+        add_header X-Frame-Options "SAMEORIGIN" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "no-referrer-when-downgrade" always;
+
+        location / {
+            try_files $uri $uri/ /index.php?$query_string;
+        }
+
+        location ~ \.php$ {
+            try_files $uri =404;
+            fastcgi_hide_header X-Powered-By;
+            include fastcgi_params;
+            fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+            fastcgi_param HTTP_X_FORWARDED_FOR $http_x_forwarded_for;
+            fastcgi_param HTTP_X_FORWARDED_HOST $http_x_forwarded_host;
+            fastcgi_param HTTP_X_FORWARDED_PORT $http_x_forwarded_port;
+            fastcgi_param HTTP_X_FORWARDED_PROTO $http_x_forwarded_proto;
+            fastcgi_pass 127.0.0.1:9000;
+            fastcgi_read_timeout 300;
+            fastcgi_send_timeout 300;
+            fastcgi_connect_timeout 60;
+        }
+
+        location ~* \.(jpg|jpeg|png|gif|ico|css|js|woff2?|ttf|eot|svg)$ {
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+            access_log off;
+        }
+
+        location ~ /\.(?!well-known).* {
+            deny all;
+        }
+
+        location = /health {
+            access_log off;
+            default_type text/plain;
+            return 200 "healthy\n";
+        }
+    }

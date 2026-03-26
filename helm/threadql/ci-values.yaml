@@ -1,0 +1,65 @@
+# CI-specific values for k3s integration testing.
+# Used by .github/workflows/helm-integration.yml
+#
+# k3s ships Traefik, so HAProxy is disabled and ingress
+# uses the default class. Persistence is off (emptyDir)
+# to keep things fast and ephemeral.
+
+imagePullSecrets:
+  - name: regcred
+
+haproxy:
+  enabled: false
+
+ingress:
+  enabled: true
+  className: ""
+  hosts:
+    - host: local.threadql.com
+      paths:
+        - path: /
+          pathType: Prefix
+
+mysql:
+  rootPassword: ci-test-password
+  persistence:
+    enabled: false
+
+redis:
+  persistence:
+    enabled: false
+
+sshTunnel:
+  enabled: false
+
+worker:
+  enabled: false
+
+cronjobs: []
+
+migration:
+  enabled: true
+
+env:
+  APP_NAME: Threadql
+  APP_ENV: local
+  APP_KEY: "base64:Y2l0ZXN0a2V5dGhhdGlzZXhhY3RseTMyYg=="
+  APP_DEBUG: "true"
+  APP_URL: "http://local.threadql.com"
+  LOG_CHANNEL: stderr
+  LOG_LEVEL: debug
+  DB_CONNECTION: mysql
+  DB_PORT: "3306"
+  DB_DATABASE: threadql
+  DB_USERNAME: root
+  DB_PASSWORD: ci-test-password
+  SESSION_DRIVER: redis
+  SESSION_LIFETIME: "120"
+  QUEUE_CONNECTION: sync
+  CACHE_STORE: redis
+  REDIS_PORT: "6379"
+  REDIS_PASSWORD: ""
+  BROADCAST_CONNECTION: log
+  FILESYSTEM_DISK: local
+  BCRYPT_ROUNDS: "4"
+  MASTER_ADMIN_PASSWORD: ci-test-admin

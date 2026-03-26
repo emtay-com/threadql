@@ -1,0 +1,111 @@
+services:
+  mysql:
+    image: mysql:8.0
+    ports:
+      - "3306:3306"
+    networks:
+      - threadql
+    volumes:
+      - dbdata:/var/lib/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: root
+  threadql:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+      target: dev
+    image: emtaycom/threadql:latest
+    container_name: threadql
+    ports:
+      - "9000:9000"
+    networks:
+      - threadql
+    volumes:
+      - ./:/var/www/app:delegated
+    environment:
+      APP_ENV: local
+  worker:
+    build:
+      context: docker/worker
+      dockerfile: Dockerfile
+    image: emtaycom/threadql-worker:latest
+    container_name: threadql-worker
+    networks:
+      - threadql
+    volumes:
+      - ./:/var/www/app:delegated
+    environment:
+      APP_ENV: local
+    env_file:
+      - .env
+    depends_on:
+      - mysql
+      - redis
+      - threadql
+    restart: unless-stopped
+  nginx:
+    image: nginx:latest
+    container_name: threadql-nginx
+    ports:
+      - "80:80"
+    networks:
+      - threadql
+    volumes:
+      # Mount your vhost as default.conf so the entrypoint uses it
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      # Mount the app code so nginx can serve /public
+      - ./:/var/www/app:cached
+    depends_on:
+      - threadql
+  redis:
+    image: redis:7-alpine
+    container_name: threadql-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - threadql
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+  ollama:
+    image: alpine/llama3.2
+    container_name: threadql-ollama
+    ports:
+      - "11434:11434"
+    environment:
+      - OLLAMA_NUM_THREAD=8
+      - OLLAMA_NUM_PARALLEL=1
+    cpus: 8.0
+    networks:
+      - threadql
+  ssh-tunnel:
+    build:
+      context: ./docker/ssh-tunnel
+      dockerfile: Dockerfile
+    container_name: threadql-ssh-tunnel
+    image: emtaycom/threadql-ssh-tunnel:latest
+    environment:
+      - REDIS_URL=redis://threadql-redis:6379
+      - PORT_RANGE_START=13300
+      - PORT_RANGE_END=13399
+      - HOST=0.0.0.0
+      - PORT=8092
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - threadql
+    restart: unless-stopped
+volumes:
+  dbdata:
+  redisdata:
+networks:
+  threadql:
+    driver: bridge
+    name: threadql

@@ -1,0 +1,20 @@
+{{- if .Values.sshTunnel.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "threadql.fullname" . }}-ssh-tunnel
+  labels:
+    {{- include "threadql.sshTunnel.labels" . | nindent 4 }}
+spec:
+  # Headless service — resolves directly to the pod IP so all tunnel ports
+  # ({{ .Values.sshTunnel.portRangeStart }}-{{ .Values.sshTunnel.portRangeEnd }})
+  # are reachable without enumerating them individually.
+  clusterIP: None
+  ports:
+    - port: {{ .Values.sshTunnel.service.apiPort }}
+      targetPort: api
+      protocol: TCP
+      name: api
+  selector:
+    {{- include "threadql.sshTunnel.selectorLabels" . | nindent 4 }}
+{{- end }}

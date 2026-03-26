@@ -1,0 +1,155 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "threadql.fullname" . }}
+  labels:
+    {{- include "threadql.app.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.app.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "threadql.app.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/env: {{ include (print $.Template.BasePath "/secret-env.yaml") . | sha256sum }}
+        checksum/nginx: {{ include (print $.Template.BasePath "/configmap-nginx.yaml") . | sha256sum }}
+        {{- with .Values.app.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "threadql.app.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.app.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        {{- if .Values.mysql.enabled }}
+        # Wait for MySQL to accept connections before starting
+        - name: wait-for-mysql
+          image: "{{ .Values.app.php.image.repository }}:{{ include "threadql.imageTag" (dict "imageConfig" .Values.app.php.image "global" .Values) }}"
+          imagePullPolicy: {{ .Values.app.php.image.pullPolicy }}
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for MySQL on {{ include "threadql.fullname" . }}-mysql:3306..."
+              while ! php -r "@fsockopen('{{ include "threadql.fullname" . }}-mysql', 3306, \$errno, \$errstr, 3) or exit(1);" 2>/dev/null; do
+                echo "MySQL not ready, retrying in 3s..."
+                sleep 3
+              done
+              echo "MySQL is ready."
+        {{- end }}
+        {{- if .Values.migration.enabled }}
+        # Run database migrations before the app starts
+        - name: migrate
+          image: "{{ .Values.app.php.image.repository }}:{{ include "threadql.imageTag" (dict "imageConfig" .Values.app.php.image "global" .Values) }}"
+          imagePullPolicy: {{ .Values.app.php.image.pullPolicy }}
+          command:
+            {{- toYaml .Values.migration.command | nindent 12 }}
+          envFrom:
+            {{- include "threadql.envFrom" . | nindent 12 }}
+          {{- with .Values.migration.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+        {{- end }}
+        # Copy public assets from PHP image into shared volume for nginx
+        - name: copy-public
+          image: "{{ .Values.app.php.image.repository }}:{{ include "threadql.imageTag" (dict "imageConfig" .Values.app.php.image "global" .Values) }}"
+          imagePullPolicy: {{ .Values.app.php.image.pullPolicy }}
+          command: ["cp", "-r", "/var/www/app/public/.", "/shared-public/"]
+          volumeMounts:
+            - name: public-assets
+              mountPath: /shared-public
+      containers:
+        # --- PHP-FPM container ---
+        - name: php-fpm
+          image: "{{ .Values.app.php.image.repository }}:{{ include "threadql.imageTag" (dict "imageConfig" .Values.app.php.image "global" .Values) }}"
+          imagePullPolicy: {{ .Values.app.php.image.pullPolicy }}
+          ports:
+            - name: fastcgi
+              containerPort: 9000
+              protocol: TCP
+          envFrom:
+            {{- include "threadql.envFrom" . | nindent 12 }}
+          {{- with .Values.app.php.extraEnv }}
+          env:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.app.php.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.app.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          readinessProbe:
+            tcpSocket:
+              port: fastcgi
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: fastcgi
+            initialDelaySeconds: 10
+            periodSeconds: 30
+
+        # --- Nginx container ---
+        - name: nginx
+          image: "{{ .Values.app.nginx.image.repository }}:{{ .Values.app.nginx.image.tag }}"
+          imagePullPolicy: {{ .Values.app.nginx.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: default.conf
+              readOnly: true
+            - name: public-assets
+              mountPath: /var/www/app/public
+              readOnly: true
+          {{- with .Values.app.nginx.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30
+
+      volumes:
+        - name: nginx-config
+          configMap:
+            name: {{ include "threadql.fullname" . }}-nginx
+        - name: public-assets
+          emptyDir: {}
+
+      {{- with .Values.app.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.app.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.app.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

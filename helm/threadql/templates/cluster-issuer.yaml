@@ -1,0 +1,16 @@
+{{- if .Values.certManager.enabled }}
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: {{ .Values.certManager.issuerName }}
+  labels:
+    {{- include "threadql.labels" . | nindent 4 }}
+spec:
+  acme:
+    email: {{ required "certManager.email is required when certManager.enabled is true" .Values.certManager.email }}
+    server: {{ .Values.certManager.server }}
+    privateKeySecretRef:
+      name: {{ .Values.certManager.issuerName }}-account-key
+    solvers:
+      {{- toYaml .Values.certManager.solvers | nindent 6 }}
+{{- end }}

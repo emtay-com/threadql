@@ -1,0 +1,44 @@
+{{- range .Values.cronjobs }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "threadql.fullname" $ }}-{{ .name }}
+  labels:
+    {{- include "threadql.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: cronjob-{{ .name }}
+spec:
+  schedule: {{ .schedule | quote }}
+  concurrencyPolicy: {{ .concurrencyPolicy | default "Forbid" }}
+  successfulJobsHistoryLimit: {{ .successfulJobsHistoryLimit | default 3 }}
+  failedJobsHistoryLimit: {{ .failedJobsHistoryLimit | default 1 }}
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            {{- include "threadql.selectorLabels" $ | nindent 12 }}
+            app.kubernetes.io/component: cronjob-{{ .name }}
+        spec:
+          {{- with $.Values.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          restartPolicy: {{ .restartPolicy | default "Never" }}
+          containers:
+            - name: {{ .name }}
+              image: "{{ $.Values.app.php.image.repository }}:{{ include "threadql.imageTag" (dict "imageConfig" $.Values.app.php.image "global" $.Values) }}"
+              imagePullPolicy: {{ $.Values.app.php.image.pullPolicy }}
+              command:
+                {{- toYaml .command | nindent 16 }}
+              envFrom:
+                {{- include "threadql.envFrom" $ | nindent 16 }}
+              {{- with .extraEnv }}
+              env:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
+              {{- with .resources }}
+              resources:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
+{{- end }}
