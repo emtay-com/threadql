@@ -237,12 +237,11 @@ envFrom:
   configMapRef: ""
 
 # These values are used to create a Secret when envFrom.secretRef is empty.
-# DB_HOST, REDIS_HOST, MCP_APP_URL, and SSH_TUNNEL_MANAGER_URL are auto-set
-# by the chart when their respective components are enabled.
+# DB_HOST, REDIS_HOST, MCP_APP_URL, SSH_TUNNEL_MANAGER_URL, and THREADQL_VERSION
+# are auto-set by the chart.
 env:
   APP_NAME: ThreadQL
   APP_ENV: production
-  THREADQL_VERSION: "0.0.6"
   APP_KEY: ""  # Required — generate with: php artisan key:generate --show
   APP_DEBUG: "false"
   APP_URL: "https://threadql.local"
