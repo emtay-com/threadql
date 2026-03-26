@@ -2,6 +2,8 @@
 
 Multi-tenant natural language to SQL via Slack. Users ask questions in Slack, ThreadQL converts them to SQL queries using LLMs, executes them against configured datasources, and returns formatted results.
 
+![ThreadQL video chat screenshot 1](stubs/video_chat_1.png)
+
 - **Documentation**: [threadql.com](https://threadql.com)
 - **GitHub**: [github.com/emtay-com/threadql](https://github.com/emtay-com/threadql)
 
@@ -26,6 +28,8 @@ make ecsfix      # Fix code style
 ```bash
 composer dev     # Starts artisan serve, queue:listen, pail (logs), and npm dev (vite)
 ```
+
+![ThreadQL video chat screenshot 2](stubs/video_chat_2.png)
 
 See [CLAUDE.md](CLAUDE.md) for full development documentation.
 
@@ -117,6 +121,8 @@ helm upgrade --install app helm/threadql \
   -f helm/threadql/my-values.yaml
 ```
 
+![ThreadQL admin screenshot 1](stubs/admin_1.png)
+
 ### Verify TLS
 
 The TLS certificate will be issued automatically after rollout once DNS propagates (typically 1-5 minutes).
@@ -156,6 +162,8 @@ The Helm chart deploys:
 | **MySQL** | Primary database (optional — can use external) |
 | **HAProxy** | Ingress controller (optional — for clusters without one) |
 | **ClusterIssuer** | Let's Encrypt certificate issuer (when `certManager.enabled`) |
+
+![ThreadQL admin screenshot 2](stubs/admin_2.png)
 
 ### Useful Commands
 
