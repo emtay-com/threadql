@@ -21,7 +21,7 @@
         "laravel/mcp": "^0.5.2",
         "laravel/tinker": "^2.10.1",
         "league/flysystem-aws-s3-v3": "^3.32",
-        "prism-php/prism": "^0.99.19",
+        "particle-academy/prism": "^0.110.0",
         "prism-php/relay": "^1.4",
         "tymon/jwt-auth": "^2.2"
     },
