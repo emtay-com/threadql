@@ -14,12 +14,12 @@
     ],
     "license": "MIT",
     "require": {
-        "php": "^8.4",
+        "php": "8.5.*",
         "ext-pdo": "*",
         "jolicode/slack-php-api": "^4.9.0",
-        "laravel/framework": "^12.45",
+        "laravel/framework": "^13.12",
         "laravel/mcp": "^0.5.2",
-        "laravel/tinker": "^2.10.1",
+        "laravel/tinker": "^3.0",
         "league/flysystem-aws-s3-v3": "^3.32",
         "particle-academy/prism": "^0.110.0",
         "prism-php/relay": "^1.4",
@@ -34,7 +34,7 @@
         "mockery/mockery": "^1.6",
         "nunomaduro/collision": "^8.6",
         "phpstan/phpstan": "^2.1",
-        "phpunit/phpunit": "^11.5.3",
+        "phpunit/phpunit": "12.5.*",
         "symplify/easy-coding-standard": "^12.6"
     },
     "autoload": {

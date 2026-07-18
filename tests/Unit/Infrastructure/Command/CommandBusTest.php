@@ -29,12 +29,15 @@ class CommandBusTest extends TestCase
 
         $this->container = new Container();
         $this->locator = new CommandHandlerLocator($this->container);
-        $this->logger = $this->createMock(LoggerInterface::class);
+        $this->logger = $this->createStub(LoggerInterface::class);
         $this->commandBus = new CommandBus($this->locator, $this->logger);
     }
 
     public function test_it_dispatches_command_successfully(): void
     {
+        $this->logger = $this->createMock(LoggerInterface::class);
+        $this->commandBus = new CommandBus($this->locator, $this->logger);
+
         $command = new TestCommand('Hello World');
 
         $this->logger->expects($this->once())
