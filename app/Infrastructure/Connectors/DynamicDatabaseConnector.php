@@ -194,7 +194,7 @@ class DynamicDatabaseConnector
         $config['collation'] = 'utf8mb4_unicode_ci';
         $config['strict'] = true;
         $config['engine'] = null;
-        $config['options'][PDO::MYSQL_ATTR_INIT_COMMAND] = 'SET SESSION TRANSACTION READ ONLY';
+        $config['options'][\Pdo\Mysql::ATTR_INIT_COMMAND] = 'SET SESSION TRANSACTION READ ONLY';
     }
 
     /**
@@ -210,7 +210,7 @@ class DynamicDatabaseConnector
     /**
      * Apply post-connect settings for driver-specific session configuration.
      * PostgreSQL requires a session statement for read-only mode since it lacks
-     * an equivalent to MySQL's PDO::MYSQL_ATTR_INIT_COMMAND.
+     * an equivalent to MySQL's Pdo\Mysql::ATTR_INIT_COMMAND.
      */
     private function applyPostConnectSettings(Connection $connection, string $driver): void
     {

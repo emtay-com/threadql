@@ -7,6 +7,7 @@ namespace Tests\Unit\Http\Middleware;
 use App\Http\Middleware\RestrictToInternalNetwork;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class RestrictToInternalNetworkTest extends TestCase
@@ -23,9 +24,7 @@ class RestrictToInternalNetworkTest extends TestCase
         $this->app['env'] = 'local';
     }
 
-    /**
-     * @dataProvider allowedPrivateIpsProvider
-     */
+    #[DataProvider('allowedPrivateIpsProvider')]
     public function test_it_allows_private_network_ips(string $ip): void
     {
         $request = $this->createRequestWithIp($ip);
@@ -41,9 +40,7 @@ class RestrictToInternalNetworkTest extends TestCase
         $this->assertEquals(200, $response->getStatusCode());
     }
 
-    /**
-     * @dataProvider blockedPublicIpsProvider
-     */
+    #[DataProvider('blockedPublicIpsProvider')]
     public function test_it_blocks_public_ips(string $ip): void
     {
         $request = $this->createRequestWithIp($ip);
