@@ -101,8 +101,8 @@ class DynamicDatabaseConnectorTest extends TestCase
         $this->assertTrue($config['strict']);
         $this->assertArrayHasKey('options', $config);
         $this->assertArrayHasKey(PDO::ATTR_TIMEOUT, $config['options']);
-        $this->assertArrayHasKey(PDO::MYSQL_ATTR_INIT_COMMAND, $config['options']);
-        $this->assertEquals('SET SESSION TRANSACTION READ ONLY', $config['options'][PDO::MYSQL_ATTR_INIT_COMMAND]);
+        $this->assertArrayHasKey(\Pdo\Mysql::ATTR_INIT_COMMAND, $config['options']);
+        $this->assertEquals('SET SESSION TRANSACTION READ ONLY', $config['options'][\Pdo\Mysql::ATTR_INIT_COMMAND]);
     }
 
     #[Test]
@@ -122,7 +122,7 @@ class DynamicDatabaseConnectorTest extends TestCase
         $this->assertEquals('public', $config['schema']);
         $this->assertEquals('prefer', $config['sslmode']);
         $this->assertArrayNotHasKey('collation', $config);
-        $this->assertArrayNotHasKey(PDO::MYSQL_ATTR_INIT_COMMAND, $config['options']);
+        $this->assertArrayNotHasKey(\Pdo\Mysql::ATTR_INIT_COMMAND, $config['options']);
     }
 
     #[Test]

@@ -41,10 +41,10 @@ class LlmFallbackExecutorTest extends TestCase
     {
         parent::setUp();
 
-        $this->prismMapper = $this->createMock(PrismProviderMapper::class);
-        $this->providerResolver = $this->createMock(LlmProviderResolver::class);
+        $this->prismMapper = $this->createStub(PrismProviderMapper::class);
+        $this->providerResolver = $this->createStub(LlmProviderResolver::class);
         $this->classifier = new FallbackExceptionClassifier();
-        $this->settingService = $this->createMock(SlackUserSettingService::class);
+        $this->settingService = $this->createStub(SlackUserSettingService::class);
 
         $this->executor = new LlmFallbackExecutor(
             $this->prismMapper,
@@ -62,7 +62,7 @@ class LlmFallbackExecutorTest extends TestCase
         ]);
         $this->createFallbackSetting($tenant, 3);
 
-        $mockResponse = $this->createMock(Response::class);
+        $mockResponse = $this->createStub(Response::class);
 
         $this->providerResolver->method('resolveAll')
             ->willReturn([$provider]);
@@ -88,7 +88,7 @@ class LlmFallbackExecutorTest extends TestCase
         ]);
         $this->createFallbackSetting($tenant, 3);
 
-        $mockResponse = $this->createMock(Response::class);
+        $mockResponse = $this->createStub(Response::class);
 
         $this->providerResolver->method('resolveAll')
             ->willReturn([$provider1, $provider2]);
@@ -220,7 +220,7 @@ class LlmFallbackExecutorTest extends TestCase
         ]);
         $this->createFallbackSetting($tenant, 3);
 
-        $mockResponse = $this->createMock(Response::class);
+        $mockResponse = $this->createStub(Response::class);
 
         $this->providerResolver->method('resolveAll')
             ->willReturn([$provider1, $provider2]);
@@ -265,7 +265,7 @@ class LlmFallbackExecutorTest extends TestCase
             'slack_user_id' => $slackUser->id,
         ]);
 
-        $mockResponse = $this->createMock(Response::class);
+        $mockResponse = $this->createStub(Response::class);
 
         $this->providerResolver->method('resolveAll')
             ->willReturn([$provider1, $provider2]);
@@ -314,7 +314,7 @@ class LlmFallbackExecutorTest extends TestCase
             'slack_user_id' => $slackUser->id,
         ]);
 
-        $mockResponse = $this->createMock(Response::class);
+        $mockResponse = $this->createStub(Response::class);
 
         $this->providerResolver->method('resolveAll')
             ->willReturn([$provider1, $provider2]);
@@ -351,7 +351,7 @@ class LlmFallbackExecutorTest extends TestCase
         ]);
         $this->createFallbackSetting($tenant, 3);
 
-        $mockResponse = $this->createMock(Response::class);
+        $mockResponse = $this->createStub(Response::class);
 
         $this->providerResolver->method('resolveAll')
             ->willReturn([$provider2, $provider1]);

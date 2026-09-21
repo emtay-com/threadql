@@ -20,12 +20,14 @@ final class ResponseFormatterTest extends TestCase
     {
         parent::setUp();
         $this->formatter = new ResponseFormatter();
-        $this->mockScanner = $this->createMock(TableScanner::class);
+        $this->mockScanner = $this->createStub(TableScanner::class);
     }
 
     #[Test]
     public function it_builds_blocks_in_order_from_text_and_tables(): void
     {
+        $this->mockScanner = $this->createMock(TableScanner::class);
+
         $input = "Here's some text\n[TABLE]\nName,Value\nTest,123\n[/TABLE]\nAnd more text";
 
         // Mock the scanner to return specific blocks
@@ -107,6 +109,8 @@ final class ResponseFormatterTest extends TestCase
     #[Test]
     public function it_strips_empty_segments(): void
     {
+        $this->mockScanner = $this->createMock(TableScanner::class);
+
         $input = "Text\n\n\n[TABLE]\nA,1\n[/TABLE]\n\n\nMore text";
 
         $this->mockScanner->expects($this->once())
@@ -251,8 +255,8 @@ final class ResponseFormatterTest extends TestCase
     #[Test]
     public function it_can_add_multiple_scanners(): void
     {
-        $scanner1 = $this->createMock(TagScannerInterface::class);
-        $scanner2 = $this->createMock(TagScannerInterface::class);
+        $scanner1 = $this->createStub(TagScannerInterface::class);
+        $scanner2 = $this->createStub(TagScannerInterface::class);
 
         $this->formatter->addScanner($scanner1);
         $this->formatter->addScanner($scanner2);

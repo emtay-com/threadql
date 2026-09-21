@@ -34,8 +34,8 @@ final class PaginationActionHandlerTest extends TestCase
     {
         parent::setUp();
 
-        $this->slackMessenger = $this->createMock(SlackMessenger::class);
-        $this->anchorService = $this->createMock(QueryAnchorService::class);
+        $this->slackMessenger = $this->createStub(SlackMessenger::class);
+        $this->anchorService = $this->createStub(QueryAnchorService::class);
         $this->handler = new PaginationActionHandler($this->slackMessenger, $this->anchorService);
 
         $this->tenant = Tenant::factory()->create();
@@ -46,6 +46,7 @@ final class PaginationActionHandlerTest extends TestCase
 
     public function test_handle_dispatches_pagination_job_for_valid_query(): void
     {
+        $this->useMocks();
         Bus::fake();
         Log::shouldReceive('info')->twice();
         Log::shouldReceive('warning')->once();
@@ -166,6 +167,7 @@ final class PaginationActionHandlerTest extends TestCase
 
     public function test_handle_accepts_input_requested_status(): void
     {
+        $this->useMocks();
         Bus::fake();
         Log::shouldReceive('info')->twice();
         Log::shouldReceive('warning')->once();
@@ -189,6 +191,7 @@ final class PaginationActionHandlerTest extends TestCase
 
     public function test_handle_uses_zero_offset_when_no_metadata(): void
     {
+        $this->useMocks();
         Bus::fake();
         Log::shouldReceive('info')->twice();
         Log::shouldReceive('warning')->once();
@@ -216,6 +219,7 @@ final class PaginationActionHandlerTest extends TestCase
 
     public function test_handle_uses_zero_offset_when_offset_not_in_metadata(): void
     {
+        $this->useMocks();
         Bus::fake();
         Log::shouldReceive('info')->twice();
         Log::shouldReceive('warning')->once();
@@ -247,6 +251,7 @@ final class PaginationActionHandlerTest extends TestCase
 
     public function test_handle_updates_working_message_when_anchor_found(): void
     {
+        $this->useMocks(true);
         Bus::fake();
         Log::shouldReceive('info')->twice();
 
@@ -303,6 +308,7 @@ final class PaginationActionHandlerTest extends TestCase
 
     public function test_handle_logs_warning_when_anchor_not_found(): void
     {
+        $this->useMocks();
         Bus::fake();
 
         $query = Query::factory()->create([
@@ -329,6 +335,7 @@ final class PaginationActionHandlerTest extends TestCase
 
     public function test_handle_catches_exception_when_updating_working_message_fails(): void
     {
+        $this->useMocks(true);
         Bus::fake();
 
         $query = Query::factory()->create([
@@ -372,6 +379,7 @@ final class PaginationActionHandlerTest extends TestCase
 
     public function test_handle_logs_pagination_request_info(): void
     {
+        $this->useMocks();
         Bus::fake();
 
         $query = Query::factory()->create([
@@ -406,5 +414,14 @@ final class PaginationActionHandlerTest extends TestCase
         $response = $this->handler->handle($query->id, '75');
 
         $this->assertEquals(204, $response->getStatusCode());
+    }
+    private function useMocks(bool $mockSlackMessenger = false): void
+    {
+        if ($mockSlackMessenger) {
+            $this->slackMessenger = $this->createMock(SlackMessenger::class);
+        }
+
+        $this->anchorService = $this->createMock(QueryAnchorService::class);
+        $this->handler = new PaginationActionHandler($this->slackMessenger, $this->anchorService);
     }
 }

@@ -1,6 +1,6 @@
-# Use PHP 8.4 FPM on Alpine
-# You can pin a patch if you like: php:8.4.1-fpm-alpine
-FROM php:8.4-fpm-alpine AS dev
+# Use PHP 8.5 FPM on Alpine
+# Pinned to avoid unreviewed PHP patch-version changes during rebuilds.
+FROM php:8.5.8-fpm-alpine AS dev
 
 # ---- Runtime packages (no -dev here) ----
 # Keep this lean; add dev libs only in the build step below.
@@ -13,13 +13,12 @@ RUN set -eux; \
         $PHPIZE_DEPS \
         openssl-dev postgresql-dev \
     ; \
-    # Core PHP extensions
+    # Database and process-control extensions. PDO and OPcache are bundled with
+    # the PHP 8.5 image, so only install extensions not included by the base image.
     docker-php-ext-install -j"$(nproc)" \
-        pdo pdo_mysql pdo_pgsql \
+        pdo_mysql pdo_pgsql \
         pcntl \
     ; \
-    # Optional: OPcache is recommended for Laravel prod
-    docker-php-ext-install -j"$(nproc)" opcache; \
     # Redis extension
     pecl install redis; \
     docker-php-ext-enable redis; \
@@ -30,6 +29,9 @@ RUN set -eux; \
 # ---- PHP/FPM config ----
 COPY docker/php/cookie.ini /usr/local/etc/php/conf.d/cookie.ini
 COPY docker/php/www.conf /usr/local/etc/php-fpm.d/www.conf
+
+# Make Composer available in the development container as well as production.
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 # FPM process management tweaks
 RUN sed -i "s/;process_control_timeout = 0/process_control_timeout = 10s/" /usr/local/etc/php-fpm.conf \
@@ -56,9 +58,6 @@ RUN npm run build
 
 # ---- Production stage ----
 FROM dev AS prod
-
-# Install composer
-COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 # Copy application code (build context must be project root)
 COPY . /var/www/app
